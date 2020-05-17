@@ -1,0 +1,291 @@
+---
+title: "Poisson Regression and Applications"
+author: "Adam Dawson, Sarah Onstad-Hawes, and Asare Buahin"
+date: "12/13/2019"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+ 
+
+##  Introduction: Main Project Questions
+
+- What is the Poisson Regression and what are it's applications?
+
+- Can we fit the Poisson regression to our data set and use it to make any inferences about the relationships we see?
+
+
+## Introduction: Our Data Set
+
+
+ - "Contact with Medical Doctors"
+ 
+    - Cross-Sectional data collected in North Carolina between 1977-78
+ 
+    - Examines 20186 observations of individuals
+ 
+      - Randomly selected subset of 2000 observations for ease of computation
+    
+    - Collected from RAND Health Insurance Experiment (RHIE), which is the longest and largest socially controlled experiment regarding medical care (Price, D. 2002)
+    
+    - Our Response Variable of interest is mdu, which captures the number of times an individual visited a medical health profession during the study
+    
+    - Data Set also contains 14 other variables of interest
+      
+
+## Introduction: Our Research Question
+
+- How is the number of doctor visits impacted by various factors in an individual's life?
+
+  - Specifically, we want see how one's age, sex, income, physical limitations, and present diseases influence their ability to seek out medical care.  
+  
+- Use the Poisson Regression to model the data and see what relationships, if any, exist in between our variables.  
+
+
+## Methodology: The Poisson Distribution
+
+- A probability function which is especially useful for count data
+    - $Y$ is a variable with discrete outcomes ($0,1,2,...$) where high counts for $Y$ are rare
+    - $f(Y) = \frac{\mu^{Y}*e^{-\mu}}{Y!}$
+    - $E[Y] = \mu$
+    - $P(Y = y) = \frac{\mu^{y}*e^{-\mu}}{y!}$
+    - $\mu$ also sometimes noted as $\lambda$
+    
+## Methodology: Necessary Conditions for the Poisson Distribution
+
+- The Mean and Variance of Y are equal
+  - $E[Y] = V[Y] = \mu$
+  
+- Independence
+  - An event A occuring does not impact event B from occuring
+  
+- Each observation is recorder over the same fixed period of time.
+
+- Data Set is not overloaded with zero counts. 
+
+## Methodology: The Poisson Regression
+
+- Poisson Regression finds estimates for the linear equation relating the log of a response variable to predictors.
+  - $log(\hat{\mu}) = \beta_{0} + \beta_{1}X_{1} + \beta_{2}X_{2} + ... + \beta_{p}X_{p}$
+  - $\hat{\mu} = e^{\beta_{0} + \beta_{1}X_{1} + \beta_{2}X_{2} + ... + \beta_{p}X_{p}}$
+-  Allows us to see how a marginal change in our predictor variable impacts the estimated count of our variable.  
+- Coefficients found using the Maximum Likelihood Estimate process
+
+- Coefficients evalued for statisical significance using z-statistic and corresponding p-value
+
+- We can use R glm function where we indicate the family to be "poisson" in order to obtain our fitted equation and coefficient estimates. 
+
+
+## Results and Conclusion: An Introduction to our Data
+
+- Observational Units: Individuals in North Carolina
+
+- Overall, we have chosen five predictor variables to estimate our response variable
+- Response Variable: 
+    - mdu measures the number of doctors visits one person attends in a year: Count
+- Predictor Variables used:
+  - Linc denotes a person's yearly log(income): Quantitative
+  - Age denotes a person's age at the time of the study: Quantitative
+  - Physlim denotes if a person has any sort of  physical limitation: Categorical, Binary
+  - ndiseases denotes the number of diagnosed diseases a person has at the time of the study:Quantitative
+  - Sex denotes the sex of the patient: Categorical, Binary (Male == 1, Female == 0)
+
+## Results and Conclusions: An Introduction to our Data continued
+
+```{r, message = FALSE, warning = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(here)
+library(Stat2Data)
+library(knitr)
+library(leaps)
+library(GGally)
+
+Doctor <- read.csv(here("", "DoctorContacts.csv"))
+Doctor <- as_tibble(Doctor)
+
+set.seed(1)
+Doc_sample <- Doctor[sample(1:nrow(Doctor), 2000,
+   replace=FALSE),]
+
+Doctor_Summary <- Doc_sample %>%
+            	summarize(count = n(), st.dev = round(sd(mdu),2),
+                      	sample_mean = round(mean(mdu),2), med = round(median(mdu), 2),
+                        	min = min(mdu), max = max(mdu))
+kable(Doctor_Summary)
+```
+
+- $\mu$ = 2.87, $\sigma^{2}$ = 4.56
+
+  - Over-disperion present
+
+***
+
+```{r, message =  FALSE, warning= FALSE, fig.height = 2, fig.width = 3, fig.cap= "Count of an Individual's Doctors Visits in a Year"}
+p <- ggplot(data = Doc_sample)
+
+p + geom_histogram(mapping = aes(x = mdu), bins = 50 )
+```
+
+
+- Histogram shows a distribution skewed to the right
+  - A high number of 0 counts in our data set
+
+## Results and Conclusions: Forward Selction:Step 1
+```{r, message = FALSE, warning = FALSE, echo=TRUE}
+regmod1<-glm(mdu~physlim, Doc_sample, family=poisson)
+regmod2<-glm(mdu~ndisease, Doc_sample, family=poisson)
+regmod3<-glm(mdu~linc, Doc_sample, family=poisson)
+regmod4<-glm(mdu~age, Doc_sample, family=poisson)
+regmod5<-glm(mdu~sex, Doc_sample, family=poisson)
+p.physlim <- summary(regmod1)$coefficients[2,4]
+p.disease <- summary(regmod2)$coefficients[2,4]
+p.linc <- summary(regmod3)$coefficients[2,4]
+p.age <- summary(regmod4)$coefficients[2,4]
+p.sex <- summary(regmod5)$coefficients[2,4]
+```
+## Results and Conclusions: Forward Selction:Step 1  
+```{r, message = FALSE, warning = FALSE}
+pvalstep1 = rbind(p.physlim, p.disease, p.linc,p.age,p.sex)
+pvalstep1
+```
+## Results and Conclusions: Forward Selction:Step 2
+```{r, message = FALSE, warning = FALSE, echo=TRUE}
+regmod11<-glm(mdu~ndisease+physlim, Doc_sample, 
+              family=poisson)
+regmod12<-glm(mdu~ndisease+linc, Doc_sample, 
+              family=poisson)
+regmod13<-glm(mdu~ndisease+age, Doc_sample, 
+              family=poisson)
+regmod14<-glm(mdu~ndisease+sex, Doc_sample, 
+              family=poisson)
+p.dp <- summary(regmod11)$coefficients[3,4]
+p.dli <- summary(regmod12)$coefficients[3,4]
+p.da <- summary(regmod13)$coefficients[3,4]
+p.ds <- summary(regmod14)$coefficients[3,4]
+```
+```{r, message = FALSE, warning = FALSE}
+pvalstep2=rbind(p.dp, p.dli, p.da,p.ds)
+pvalstep2
+```
+## Results and Conclusions: Forward Selction:Step 3
+```{r, message = FALSE, warning = FALSE, echo=TRUE}
+regmod21<-glm(mdu~ndisease+physlim+age, 
+              Doc_sample, family=poisson)
+regmod22<-glm(mdu~ndisease+physlim+sex, 
+              Doc_sample, family=poisson)
+regmod23<-glm(mdu~ndisease+physlim+linc, 
+              Doc_sample, family=poisson)
+p.dpa <- summary(regmod21)$coefficients[4,4]
+p.dps <- summary(regmod22)$coefficients[4,4]
+p.dpl <- summary(regmod23)$coefficients[4,4]
+```
+```{r, message = FALSE, warning = FALSE}
+pvalstep3=rbind(p.dpa, p.dps, p.dpl)
+pvalstep3
+```
+## Results and Conclusions: Forward Selction:Step 4
+```{r, message = FALSE, warning = FALSE, echo=TRUE}
+regmod31<-glm(mdu~ndisease+physlim+linc+sex, 
+              Doc_sample, family=poisson)
+regmod32<-glm(mdu~ndisease+physlim+linc+age, 
+              Doc_sample, family=poisson)
+p.dpls <- summary(regmod31)$coefficients[5,4]
+p.dpla <- summary(regmod32)$coefficients[5,4]
+```
+```{r, message = FALSE, warning = FALSE}
+pvalstep4=rbind(p.dpls, p.dpla)
+pvalstep4
+```
+## Results and Conclusions: Forward Selction:Step 5
+```{r, message = FALSE, warning = FALSE, echo=TRUE}
+regmod41<-glm(mdu~ndisease+physlim+linc+sex+age, 
+              Doc_sample, family=poisson)
+p.dlspa <- summary(regmod41)$coefficients[6,4]
+```
+```{r, message = FALSE, warning = FALSE}
+pvalstep5=rbind(p.dlspa)
+pvalstep5
+```
+
+## Results and Conclusions: Summary Output of model
+```{r, message = FALSE, warning = FALSE}
+model <- glm( mdu ~ ndisease + physlim + linc + sex + age,  Doc_sample, family = poisson) 
+summary(model)
+```
+## Results and Conclusions: Final Model
+- From our knowledge on Poisson Distribution, we can write out the regression model like so
+$log(MDU) = -1.03+0.029NDisease + 0.435PhysLim + 0.184linc-0.245Male+0.004Age$
+
+- Which is equivalent to 
+$MDU = e^{-1.03+0.029NDisease + 0.435PhysLim + 0.184linc-0.245Male+0.004Age}$
+
+## Results and Conclusions: Another Application
+
+- In addition to regression, we can use the poisson distribution to find probabilities of specific count occurences or ranges of count occurences in the data.
+
+```{r, echo = TRUE}
+Probof4ormore = ppois(4,lambda=2.86, lower.tail=FALSE)
+Probof4ormore
+```
+
+- This gives us the probability that a person will go to the doctor's office 4 or more times in a year. We can edit the lower.tail component of this code to give us the probablity that a person will go to the doctor's office 4 or less times in a year
+
+
+## Discussion and Critiques: Model Assumptions
+
+- We have good reason to question a few necessary assumptions of the Poisson Distribution in regards to our data set
+
+- Mean and Variance are not equal $E[Y] = 2.8$ and $V[Y] = 4.5$
+  - Over-dispersion, which could indicate that we should use a different model
+
+- We have a large number of observations for which the count is 0
+
+- Consider using a different model to fit to our data
+  - Zero-Inflated Poisson Regression
+    - accounts for large number of 0 counts in data set
+  - Zero-Inflated Negative Binomial Regression
+    - helps with both larger number of 0s and over-dispersion
+
+
+## Discussion and Critiques: Inference
+
+- With our data being so significant (perhaps abnormally), we were unsure of our ability to use the fitted equation with any confidence
+
+- With a high number of possible predictors, we could have ommitted some very significant variables from the regression, which could be vital in understanding what impacts utilization of healthcare.
+
+- Data set is from the 1970s
+  - Comprehensive, but outdated
+  - If using data to enact policy shifts or structural changes, our data analysis might not be "in touch" enough with the current climate of health care. 
+ 
+ - Data is collected from N.C. only, which limits the scope in which we can make inferences.
+  - Perhaps some cultural/societal impacts in N.C. region impacted our data
+  - US healthcare system unique, so inferences at most apply only to US.
+  
+ 
+## Conclusion
+
+- Poisson Regression is useful for analyzing count data, but it is crucial to check the data set and see that conditions are met prior to analysis and inference
+
+- Having a large sample size is helpful, but also must be aware of how that potentially impacts analysis.
+
+- Working on real world data is tough and messy. Takes a lot more time and careful thought
+  - No exact, clear path for analysis
+- "One step forward, two steps back"
+
+## References
+
+https://stats.idre.ucla.edu/r/dae/poisson-regression/
+https://stats.idre.ucla.edu/stata/output/poisson-regression/
+https://stats.idre.ucla.edu/r/dae/zip/
+https://www.sciencedirect.com/science/article/pii/S0167629602000085
+https://www.dataquest.io/blog/tutorial-poisson-regression-in-r/#:~:targetText=Poisson%20Regression%20models%20are%20best,where%20the%20outcomes%20are%20counts.&targetText=Poisson%20Regression%20helps%20us%20analyze,the%20count%20or%20a%20rate).
+
+
+
+
+
+

@@ -1,0 +1,117 @@
+---
+title: "Final"
+author: "AD, SO-H, AB"
+date: "11/21/2019"
+output: pdf_document
+---
+
+
+```{r, message = FALSE, warning = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(here)
+library(Stat2Data)
+library(knitr)
+library(leaps)
+library(GGally)
+
+Doctor <- read.csv(here("", "DoctorContacts.csv"))
+Doctor <- as_tibble(Doctor)
+Doctor
+set.seed(1)
+Doc_sample <- Doctor[sample(1:nrow(Doctor), 2000,
+   replace=FALSE),]
+Doc_sample
+Doctor_Summary <- Doctor %>%
+            	summarize(count = n(), st.dev = round(sd(mdu),2),
+                      	sample_mean = round(mean(mdu),2), med = round(median(mdu), 2),
+                        	min = min(mdu), max = max(mdu))
+Doctor_Summary
+```
+
+\vspace{0.5cm}
+```{r}
+p <- ggplot(data = Doc_sample)
+
+p + geom_histogram(mapping = aes(x = mdu), bins = 50 )
+
+model <- glm( mdu ~ ndisease + physlim + linc + sex + age,  Doc_sample, family = poisson) 
+regmod1<-glm(mdu~physlim, Doc_sample, family=poisson)
+regmod2<-glm(mdu~ndisease, Doc_sample, family=poisson)
+regmod3<-glm(mdu~linc, Doc_sample, family=poisson)
+regmod4<-glm(mdu~age, Doc_sample, family=poisson)
+regmod5<-glm(mdu~sex, Doc_sample, family=poisson)
+p.physlim <- summary(regmod1)$coefficients[2,4]
+p.disease <- summary(regmod2)$coefficients[2,4]
+p.linc <- summary(regmod3)$coefficients[2,4]
+p.age <- summary(regmod4)$coefficients[2,4]
+p.sex <- summary(regmod5)$coefficients[2,4]
+rbind(p.physlim, p.disease, p.linc,p.age,p.sex)
+```
+From our knowledge on Poisson Distribution, we can write out the regression model like so
+$$log(MDU) = -1.03+0.029NDisease + 0.435PhysLim + 0.184linc-0.245Male+0.004Age$$
+Which is equivalent to 
+$$MDU = e^{-1.03+0.029NDisease + 0.435PhysLim + 0.184linc-0.245Male+0.004Age}$$
+
+What we can see from this model:
+- Men visit the doctor's office less than women do.
+
+```{r}
+regmod11<-glm(mdu~ndisease+physlim, Doc_sample, family=poisson)
+regmod12<-glm(mdu~ndisease+linc, Doc_sample, family=poisson)
+regmod13<-glm(mdu~ndisease+age, Doc_sample, family=poisson)
+regmod14<-glm(mdu~ndisease+sex, Doc_sample, family=poisson)
+p.dp <- summary(regmod11)$coefficients[3,4]
+p.dli <- summary(regmod12)$coefficients[3,4]
+p.da <- summary(regmod13)$coefficients[3,4]
+p.ds <- summary(regmod14)$coefficients[3,4]
+rbind(p.dp, p.dli, p.da,p.ds)
+```
+
+```{r}
+regmod21<-glm(mdu~ndisease+physlim+age, Doc_sample, family=poisson)
+regmod22<-glm(mdu~ndisease+physlim+sex, Doc_sample, family=poisson)
+regmod23<-glm(mdu~ndisease+physlim+linc, Doc_sample, family=poisson)
+p.dpa <- summary(regmod21)$coefficients[4,4]
+p.dps <- summary(regmod22)$coefficients[4,4]
+p.dpl <- summary(regmod23)$coefficients[4,4]
+rbind(p.dpa, p.dps, p.dpl)
+```
+
+```{r}
+regmod31<-glm(mdu~ndisease+physlim+linc+sex, Doc_sample, family=poisson)
+regmod32<-glm(mdu~ndisease+physlim+linc+age, Doc_sample, family=poisson)
+p.dpls <- summary(regmod31)$coefficients[5,4]
+p.dpla <- summary(regmod32)$coefficients[5,4]
+rbind(p.dpls, p.dpla)
+```
+
+```{r}
+regmod41<-glm(mdu~ndisease+physlim+linc+sex+age, Doc_sample, family=poisson)
+p.dlspa <- summary(regmod41)$coefficients[6,4]
+rbind(p.dlspa)
+```
+Therefore, we can add all the 5 variables considered to our model since they all have significant p values. We will use a stepwise regression to confirm that this is the best model
+```{r}
+full <- lm(mdu ~ physlim+ndisease+linc+age+sex, data = Doc_sample)
+null <- lm(mdu ~ 1, data = Doc_sample)
+#We can perform forward selection using the command:
+step(null, scope=list(lower=null, upper=full), direction="forward")
+```
+
+```{r}
+Probof4ormore = ppois(4,lambda=2.86, lower.tail=FALSE)
+Probof4ormore
+```
+The code above gives us the probability that a person will go to the doctor's office 4 or more times in a year. We can edit the lower.tail component of this code to give us the probablity that a person will go to the doctor's office 4 or less times in a year
+```{r}
+Probof4orless = ppois(4,lambda=2.86, lower.tail=TRUE)
+Probof4orless
+```
+
+```{r}
+summary(model)
+```
+
+
